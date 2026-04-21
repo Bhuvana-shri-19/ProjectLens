@@ -120,5 +120,4 @@ User Input → Data Extraction → Preprocessing → AI Analysis → Scoring →
 
 ---
 
-## 👨‍💻 Author
-Your Name
+## 👨‍💻 Author : Bhuvana Shri A
