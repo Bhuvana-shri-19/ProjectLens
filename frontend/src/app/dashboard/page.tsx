@@ -15,6 +15,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "../../context/AuthContext";
 import {
   LayoutDashboard,
   History,
@@ -35,10 +36,7 @@ import {
   Lock,
   Shield,
   Zap,
-  Globe,
   LogOut,
-  Key,
-  Camera,
   ArrowRight,
   Clock,
   X,
@@ -284,7 +282,19 @@ function Sidebar({ open, onClose, active, onSelect }: { open: boolean; onClose: 
 /* ---------------------------------------------------------------------------
  * Topbar
  * ------------------------------------------------------------------------- */
-function Topbar({ onMenu, onViewAllNotifs, onNavigate, user }: { onMenu: () => void; onViewAllNotifs: () => void; onNavigate: (key: string) => void; user: { name: string; email: string } }) {
+function Topbar({
+  onMenu,
+  onViewAllNotifs,
+  onNavigate,
+  user,
+  onLogout,
+}: {
+  onMenu: () => void;
+  onViewAllNotifs: () => void;
+  onNavigate: (key: string) => void;
+  user: { name: string; email: string; avatar?: string };
+  onLogout?: () => void;
+}) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const router = useRouter();
@@ -303,9 +313,9 @@ function Topbar({ onMenu, onViewAllNotifs, onNavigate, user }: { onMenu: () => v
         </button>
         <div className="hidden sm:block">
           <h2 className="text-base font-semibold">
-            Welcome back, <span className="pl-gradient-text">{user.name.split(' ')[0]}</span> 👋
+            Welcome back, <span className="pl-gradient-text">{(user.name || "User").split(' ')[0]}</span> 👋
           </h2>
-          <p className="text-xs opacity-60">Let's evaluate something brilliant today.</p>
+          <p className="text-xs opacity-60">Let&apos;s evaluate something brilliant today.</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -365,10 +375,19 @@ function Topbar({ onMenu, onViewAllNotifs, onNavigate, user }: { onMenu: () => v
             onClick={() => setProfileOpen(!profileOpen)}
             className={`flex items-center gap-2 rounded-full border border-white/10 bg-white/5 p-1 pr-3 transition hover:border-[hsl(var(--pl-primary)/0.5)] hover:shadow-[var(--pl-glow)] ${profileOpen ? "border-[hsl(var(--pl-primary)/0.5)] shadow-[var(--pl-glow)]" : ""}`}
           >
-            <span className="pl-gradient-bg flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold" style={{ color: "hsl(230 25% 6%)" }}>
-              B
-            </span>
-            <span className="hidden text-sm font-medium sm:inline">Bhuvana</span>
+            {user.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="h-8 w-8 rounded-full object-cover border border-white/20"
+              />
+            ) : (
+              <span className="pl-gradient-bg flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold" style={{ color: "hsl(230 25% 6%)" }}>
+                {(user.name || "U").charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="hidden text-sm font-medium sm:inline">{(user.name || "User").split(' ')[0]}</span>
           </button>
 
           {profileOpen && (
@@ -410,7 +429,10 @@ function Topbar({ onMenu, onViewAllNotifs, onNavigate, user }: { onMenu: () => v
                 </button>
                 <div className="h-px bg-white/10 mx-2 my-2" />
                 <button 
-                  onClick={() => router.push("/signin")}
+                  onClick={() => {
+                    if (onLogout) onLogout();
+                    router.push("/login");
+                  }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-400 transition hover:bg-red-500/10"
                 >
                   <LogOut className="h-4 w-4" />
@@ -428,7 +450,7 @@ function Topbar({ onMenu, onViewAllNotifs, onNavigate, user }: { onMenu: () => v
 /* ---------------------------------------------------------------------------
  * Stage 1 — Analyze form
  * ------------------------------------------------------------------------- */
-function AnalyzeForm({ onAnalyze }: { onAnalyze: () => void }) {
+function AnalyzeForm({ onAnalyze }: { onAnalyze: (url: string) => void }) {
   const [url, setUrl] = useState("");
   return (
     <section className="pl-fade-in">
@@ -477,7 +499,7 @@ function AnalyzeForm({ onAnalyze }: { onAnalyze: () => void }) {
         </label>
 
         <button
-          onClick={onAnalyze}
+          onClick={() => onAnalyze(url)}
           disabled={!url.trim()}
           className="pl-btn-primary mt-6"
         >
@@ -693,7 +715,7 @@ function AnalysisResults({ onReset }: { onReset: () => void }) {
           architectural decisions and clean code practices. The modular structure, strong typing,
           and clear documentation make it stand out as a portfolio-ready project. Adding automated
           testing and a CI pipeline would push it to a production-grade level. Overall, this is a
-          well-executed project that effectively communicates the developer's technical capability.
+          well-executed project that effectively communicates the developer&apos;s technical capability.
         </p>
       </Card>
 
@@ -799,10 +821,21 @@ type Stage = "idle" | "loading" | "results";
 /* ---------------------------------------------------------------------------
  * Settings View
  * ------------------------------------------------------------------------- */
-/* ---------------------------------------------------------------------------
- * Settings View
- * ------------------------------------------------------------------------- */
-function SettingsView({ user, onUpdate }: { user: any, onUpdate: (data: any) => void }) {
+interface DashboardUserProfile {
+  name: string;
+  email: string;
+  avatar?: string;
+  bio?: string;
+  authProvider?: "local" | "google";
+}
+
+function SettingsView({
+  user,
+  onUpdate,
+}: {
+  user: DashboardUserProfile;
+  onUpdate: (data: DashboardUserProfile) => void;
+}) {
   const [activeTab, setActiveTab] = useState("profile");
   const [profile, setProfile] = useState(user);
   const [isSaving, setIsSaving] = useState(false);
@@ -868,15 +901,28 @@ function SettingsView({ user, onUpdate }: { user: any, onUpdate: (data: any) => 
           {activeTab === "profile" && (
             <div className="pl-glass space-y-6 rounded-3xl p-8">
               <div className="flex items-center gap-6">
-                <div className="pl-gradient-bg pl-glow relative flex h-20 w-20 items-center justify-center rounded-full text-2xl font-bold" style={{ color: "hsl(230 25% 6%)" }}>
-                  {profile.name.charAt(0)}
-                  <button className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-[hsl(230_25%_12%)] text-white/70 hover:text-white">
-                    <Camera className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                {profile.avatar ? (
+                  <div className="relative flex h-20 w-20 items-center justify-center rounded-full">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={profile.avatar}
+                      alt={profile.name}
+                      className="h-20 w-20 rounded-full object-cover border-2 border-[hsl(var(--pl-primary)/0.5)] shadow-[var(--pl-glow)]"
+                    />
+                  </div>
+                ) : (
+                  <div className="pl-gradient-bg pl-glow relative flex h-20 w-20 items-center justify-center rounded-full text-2xl font-bold" style={{ color: "hsl(230 25% 6%)" }}>
+                    {(profile.name || "U").charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <h3 className="text-lg font-semibold">{profile.name}</h3>
                   <p className="text-sm opacity-60">{profile.email}</p>
+                  {profile.authProvider === "google" && (
+                    <span className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-400"></span> Google Account
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1110,14 +1156,62 @@ function NotificationsView() {
 }
 
 export default function DashboardPage() {
+  const { user: authUser, token, logout, updateUser } = useAuth();
   const [stage, setStage] = useState<Stage>("idle");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("dashboard");
-  const [user, setUser] = useState({
-    name: "Bhuvana Shri",
-    email: "bhuvana@example.com",
-    bio: "AI enthusiast and full-stack developer passionate about building intelligent systems."
-  });
+  const [customProfile, setCustomProfile] = useState<DashboardUserProfile | null>(null);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  const user: DashboardUserProfile = customProfile || {
+    name: authUser?.name || "Bhuvana Shri",
+    email: authUser?.email || "bhuvana@example.com",
+    avatar: authUser?.avatar || "",
+    bio: authUser?.bio || "AI enthusiast and full-stack developer passionate about building intelligent systems.",
+    authProvider: authUser?.authProvider || "google",
+  };
+
+  const handleUserUpdate = (data: DashboardUserProfile) => {
+    setCustomProfile(data);
+    updateUser(data);
+  };
+
+  const handleAnalyze = async (githubUrl: string) => {
+    setAnalyzeError(null);
+    setStage("loading");
+
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const response = await fetch(`${API_BASE_URL}/api/projects/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Attach the JWT token so only authenticated users can trigger analysis
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ githubUrl }),
+      });
+
+      if (response.status === 401) {
+        setAnalyzeError("Session expired. Please log in again.");
+        setStage("idle");
+        return;
+      }
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        setAnalyzeError(err.error || "Analysis failed. Please try again.");
+        setStage("idle");
+        return;
+      }
+
+      // Success — advance to results
+      setStage("results");
+    } catch {
+      setAnalyzeError("Could not reach the server. Make sure the backend is running.");
+      setStage("idle");
+    }
+  };
 
   return (
     <div className="pl-root flex w-full">
@@ -1134,23 +1228,33 @@ export default function DashboardPage() {
           onViewAllNotifs={() => setActiveNav("notifications")}
           onNavigate={(key) => setActiveNav(key)}
           user={user}
+          onLogout={logout}
         />
         <main className="flex-1 px-4 py-8 md:px-8 md:py-12">
           <div className="mx-auto w-full max-w-5xl">
             {activeNav === "dashboard" && (
               <>
-                {stage === "idle"    && <AnalyzeForm  onAnalyze={() => setStage("loading")} />}
-                {stage === "loading" && <LoadingState onDone={()    => setStage("results")} />}
+                {stage === "idle" && (
+                  <>
+                    {analyzeError && (
+                      <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                        {analyzeError}
+                      </div>
+                    )}
+                    <AnalyzeForm onAnalyze={handleAnalyze} />
+                  </>
+                )}
+                {stage === "loading" && <LoadingState onDone={() => setStage("results")} />}
                 {stage === "results" && <AnalysisResults onReset={() => setStage("idle")}   />}
               </>
             )}
-            {activeNav === "settings" && <SettingsView user={user} onUpdate={(data) => setUser(data)} />}
+            {activeNav === "settings" && <SettingsView user={user} onUpdate={handleUserUpdate} />}
             {activeNav === "notifications" && <NotificationsView />}
             {activeNav === "history" && (
               <div className="pl-glass rounded-3xl p-12 text-center">
                 <History className="mx-auto mb-4 h-12 w-12 opacity-20" />
                 <h2 className="text-2xl font-bold">Analysis History</h2>
-                <p className="mt-2 opacity-60">You haven't analyzed any projects yet.</p>
+                <p className="mt-2 opacity-60">You haven&apos;t analyzed any projects yet.</p>
               </div>
             )}
           </div>

@@ -1,19 +1,26 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const mongoose = require('mongoose');
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
+// Middleware — CORS open to all origins (public API) with authorization header support
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 app.use(express.json());
 
 // Routes
+const authRoutes = require('./routes/authRoutes');
 const projectRoutes = require('./routes/projectRoutes');
+
+app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 
 app.get('/', (req, res) => {
@@ -21,13 +28,19 @@ app.get('/', (req, res) => {
 });
 
 // Database Connection
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/projectlens')
+const mongoURI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/projectlens';
+
+if (!process.env.MONGO_URI && !process.env.MONGODB_URI) {
+  console.log('Notice: Neither MONGO_URI nor MONGODB_URI is explicitly set in .env. Falling back to local MongoDB.');
+}
+
+mongoose.connect(mongoURI)
   .then(() => {
-    console.log('MongoDB Connected successfully');
+    console.log('MongoDB connected successfully');
   })
   .catch(err => {
-    console.error('MongoDB Connection Error:', err);
-    process.exit(1); // Exit if DB fails
+    console.error('MongoDB Connection Error:', err.message || 'Failed to connect to MongoDB cluster');
+    process.exit(1);
   });
 
 const server = app.listen(PORT, () => {

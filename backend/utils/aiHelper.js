@@ -1,17 +1,24 @@
+require('dotenv').config();
 const OpenAI = require('openai');
 
-let openai;
-try {
-  openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-} catch (e) {
-  console.warn("OpenAI client init failed - check API key");
+let openai = null;
+
+if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
+  try {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    console.log('OpenAI client initialized successfully');
+  } catch (e) {
+    console.warn('OpenAI client init failed - check API key:', e.message);
+  }
+} else {
+  console.log('OpenAI API key not configured - AI features will run in mock mode');
 }
 
 async function analyzeWithAI(repoData) {
-  // Mock mode if no API key
-  if (!process.env.OPENAI_API_KEY) {
+  // Mock mode if no client or no valid API key
+  if (!openai || !process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
     return getMockAIData(repoData);
   }
 
