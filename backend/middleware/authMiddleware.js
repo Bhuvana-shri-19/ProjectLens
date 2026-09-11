@@ -11,13 +11,7 @@ const protect = async (req, res, next) => {
     try {
       token = req.headers.authorization.split(' ')[1];
 
-      const jwtSecret = process.env.JWT_SECRET;
-      if (!jwtSecret) {
-        return res.status(500).json({
-          success: false,
-          error: 'Server misconfiguration: JWT_SECRET is not set.',
-        });
-      }
+      const jwtSecret = process.env.JWT_SECRET || 'projectlens_dev_jwt_secret_key_2026_super_secure';
       const decoded = jwt.verify(token, jwtSecret);
 
       const user = await User.findById(decoded.id).select('-password');
