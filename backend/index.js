@@ -34,16 +34,18 @@ if (!process.env.MONGO_URI && !process.env.MONGODB_URI) {
   console.log('Notice: Neither MONGO_URI nor MONGODB_URI is explicitly set in .env. Falling back to local MongoDB.');
 }
 
-mongoose.connect(mongoURI)
-  .then(() => {
-    console.log('MongoDB connected successfully');
-  })
-  .catch(err => {
-    console.error('MongoDB Connection Error:', err.message || 'Failed to connect to MongoDB cluster');
-    process.exit(1);
-  });
+if (mongoURI) {
+  mongoose
+    .connect(mongoURI)
+    .then(() => {
+      console.log('MongoDB connected successfully');
+    })
+    .catch((err) => {
+      console.error('MongoDB Connection Warning:', err.message || 'Failed to connect to MongoDB cluster. Set MONGO_URI in Render environment.');
+    });
+}
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
