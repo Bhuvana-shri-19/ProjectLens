@@ -1162,6 +1162,65 @@ export default function DashboardPage() {
   const [activeNav, setActiveNav] = useState("dashboard");
   const [customProfile, setCustomProfile] = useState<DashboardUserProfile | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [historyProjects, setHistoryProjects] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [selectedHistoryProject, setSelectedHistoryProject] = useState<any | null>(null);
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+  useEffect(() => {
+    if (activeNav !== "history" || !token) return;
+
+    const loadHistory = async () => {
+      setHistoryLoading(true);
+      setHistoryError(null);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/projects`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Unable to load project history.");
+        setHistoryProjects(Array.isArray(payload.data) ? payload.data : []);
+      } catch (error) {
+        setHistoryError(error instanceof Error ? error.message : "Unable to load project history.");
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+
+    loadHistory();
+  }, [activeNav, token, API_BASE_URL]);
+
+  const openHistoryProject = async (id: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Unable to load this evaluation.");
+      setSelectedHistoryProject(payload.data);
+      setHistoryError(null);
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : "Unable to load this evaluation.");
+    }
+  };
+
+  const removeHistoryProject = async (id: string) => {
+    if (!window.confirm("Delete this saved project evaluation?")) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Unable to delete this project.");
+      setHistoryProjects((items) => items.filter((item) => item._id !== id));
+      if (selectedHistoryProject?._id === id) setSelectedHistoryProject(null);
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : "Unable to delete this project.");
+    }
+  };
 
   const user: DashboardUserProfile = customProfile || {
     name: authUser?.name || "Bhuvana Shri",
@@ -1251,11 +1310,65 @@ export default function DashboardPage() {
             {activeNav === "settings" && <SettingsView user={user} onUpdate={handleUserUpdate} />}
             {activeNav === "notifications" && <NotificationsView />}
             {activeNav === "history" && (
-              <div className="pl-glass rounded-3xl p-12 text-center">
-                <History className="mx-auto mb-4 h-12 w-12 opacity-20" />
-                <h2 className="text-2xl font-bold">Analysis History</h2>
-                <p className="mt-2 opacity-60">You haven&apos;t analyzed any projects yet.</p>
-              </div>
+              <section className="space-y-6">
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight">Analysis History</h1>
+                  <p className="mt-2 text-sm opacity-60">Your saved project evaluations.</p>
+                </div>
+                {historyError && <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{historyError}</div>}
+                {historyLoading ? (
+                  <div className="pl-glass rounded-2xl p-10 text-center"><Loader2 className="mx-auto mb-3 h-7 w-7 animate-spin" /><p className="text-sm opacity-70">Loading your evaluations...</p></div>
+                ) : historyProjects.length === 0 ? (
+                  <div className="pl-glass rounded-3xl p-12 text-center">
+                    <History className="mx-auto mb-4 h-12 w-12 opacity-20" />
+                    <h2 className="text-xl font-bold">No saved evaluations yet</h2>
+                    <p className="mt-2 text-sm opacity-60">Analyze a GitHub repository and it will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {historyProjects.map((project) => (
+                      <article key={project._id} className="pl-glass flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <h2 className="truncate text-lg font-semibold">{project.projectName}</h2>
+                          <a href={project.githubUrl} target="_blank" rel="noreferrer" className="mt-1 block truncate text-sm text-purple-300 hover:underline">{project.githubUrl}</a>
+                          <p className="mt-2 text-xs opacity-50">{new Date(project.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <div className="text-right">
+                            <div className="text-2xl font-bold">{typeof project.overallScore === "number" ? `${project.overallScore}/100` : "—"}</div>
+                            <div className="text-xs opacity-50">Overall score</div>
+                          </div>
+                          <button onClick={() => openHistoryProject(project._id)} className="pl-btn-outline">View</button>
+                          <button onClick={() => removeHistoryProject(project._id)} className="pl-btn-outline border-red-500/30 text-red-300" aria-label={`Delete ${project.projectName}`}>Delete</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                {selectedHistoryProject && (
+                  <div className="pl-glass space-y-4 rounded-2xl p-6">
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="text-xl font-bold">{selectedHistoryProject.projectName} – Evaluation</h2>
+                      <button onClick={() => setSelectedHistoryProject(null)} className="pl-btn-outline">Close</button>
+                    </div>
+                    <p className="text-sm opacity-70">{selectedHistoryProject.evaluation?.interviewerVerdict || "Evaluation details"}</p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {[
+                        ["Strengths", selectedHistoryProject.evaluation?.strengths],
+                        ["Weaknesses", selectedHistoryProject.evaluation?.weaknesses],
+                        ["Improvement suggestions", selectedHistoryProject.evaluation?.improvementSuggestions],
+                        ["Resume points", selectedHistoryProject.evaluation?.resumePoints],
+                        ["Interview questions", selectedHistoryProject.evaluation?.interviewQuestions],
+                      ].map(([label, values]: any) => (
+                        <div key={label} className="rounded-xl bg-white/5 p-4">
+                          <h3 className="mb-2 font-semibold">{label}</h3>
+                          {Array.isArray(values) && values.length ? <ul className="list-disc space-y-1 pl-5 text-sm opacity-80">{values.map((value: string, index: number) => <li key={index}>{value}</li>)}</ul> : <p className="text-sm opacity-50">No details available.</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
             )}
           </div>
         </main>
