@@ -1,9 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const { analyzeProject } = require('../controllers/projectController');
+const {
+  analyzeProject,
+  getProjects,
+  getProjectById,
+  deleteProject,
+} = require('../controllers/projectController');
 const { protect } = require('../middleware/authMiddleware');
 
-// POST /api/projects/analyze — protected: valid JWT required
-router.post('/analyze', protect, analyzeProject);
+// All project operations require an authenticated user.
+router.use(protect);
+
+router.post('/analyze', analyzeProject);
+router.get('/', getProjects);
+router.get('/:id', getProjectById);
+router.delete('/:id', deleteProject);
 
 module.exports = router;
